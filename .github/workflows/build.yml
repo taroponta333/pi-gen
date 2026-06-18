@@ -19,10 +19,8 @@ jobs:
       - name: Install QEMU
         run: |
           sudo apt update
-          sudo apt install -y \
-            qemu-user-static \
-            qemu-user-binfmt \
-            binfmt-support
+          sudo apt remove -y qemu-user-binfmt || true
+          sudo apt install -y qemu-user-static binfmt-support
 
       - name: Clean old build
         run: |
@@ -34,11 +32,17 @@ jobs:
           chmod +x build-docker.sh
           bash ./build-docker.sh
 
-      - name: Show deploy
+      - name: Show deploy contents
         if: always()
         run: |
           echo "===== DEPLOY ====="
-          find deploy || true
+          find deploy 2>/dev/null || true
+
+      - name: Show debootstrap log
+        if: always()
+        run: |
+          find . -name debootstrap.log
+          cat work/TurboPiOS/stage0/debootstrap.log 2>/dev/null || true
 
       - name: Upload Image
         if: always()
