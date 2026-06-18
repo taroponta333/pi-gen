@@ -8,18 +8,18 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      # 1. まずはユーザー自身のリポジトリ（configやカスタムスクリプト）を一時フォルダに持ってくる
+      # 1. あなたのリポジトリ（configやスクリプト）を一時フォルダにチェックアウト
       - name: Checkout User Customizations
         uses: actions/checkout@v4
         with:
           path: user-custom
 
-      # 2. 本家ラズパイ公式の「bookworm専用」のクリーンな pi-gen をクローン
+      # 2. 本家ラズパイ公式の「bookworm専用」のクリーンな pi-gen をクローン（trixie脱出対策）
       - name: Clone Official pi-gen (Bookworm Branch)
         run: |
           git clone --depth 1 --branch bookworm https://github.com/rpi-distro/pi-gen.git pi-gen-core
 
-      # 3. あなたのカスタムファイルを公式の pi-gen 環境にインジェクション（注入）
+      # 3. あなたのカスタム設定・スクリプトを公式環境へ注入
       - name: Inject Custom Configurations
         run: |
           mkdir -p pi-gen-core/stage2/05-custom-apps
@@ -38,22 +38,22 @@ jobs:
             echo "USE_QEMU=1" >> pi-gen-core/config
           fi
           
-          # Dockerビルド用のセーフティ設定を追記
+          # Dockerビルドの安定化フラグを追記
           echo "PRESERVE_CONTAINER=1" >> pi-gen-core/config
 
-      # 4. Windowsの改行コード(CRLF)の嫌がらせをここで確実に抹殺
+      # 4. Windowsの改行コード(CRLF)による構文エラーをここで確実に自動抹殺
       - name: Fix Line Endings and Permissions
         run: |
           find pi-gen-core/stage2/05-custom-apps/ -type f -name "*.sh" -exec sed -i 's/\r$//' {} + || true
           find pi-gen-core/stage2/05-custom-apps/ -type f -name "*.sh" -exec chmod +x {} + || true
 
-      # 5. Dockerビルドに最適な方法でQEMUをセットアップ
+      # 5. Dockerビルドと最も相性の良い方法でQEMU（ARMエミュレータ）を起動
       - name: Setup QEMU for ARM (Docker-friendly)
         uses: docker/setup-qemu-action@v3
         with:
           platforms: arm,arm64
 
-      # 6. 公式ベースのディレクトリに移動して Docker ビルドを実行！
+      # 6. 公式ベースの環境に移動して Docker ビルドを実行！
       - name: Build TurboPi OS
         shell: bash
         run: |
@@ -61,7 +61,7 @@ jobs:
           chmod +x build-docker.sh
           bash ./build-docker.sh
 
-      # ===== デバッグ ＆ 成果物回収（あなたの優秀なコードをベースにパスを最適化） =====
+      # ===== デバッグ ＆ 成果物回収（ユーザーさんの優秀なデバッグコードを最適化） =====
       - name: Show deploy contents
         if: always()
         run: |
