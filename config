@@ -3,3 +3,4 @@ RELEASE='bookworm'
 ENABLE_SSH=1
 FIRST_USER_NAME='pi'
 FIRST_USER_PASS='raspberry'
+USE_QEMU=1
