@@ -1,56 +1,33 @@
 name: Build TurboPi OS
 
 on:
-  workflow_dispatch:
+workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: ubuntu-22.04
+build:
+runs-on: ubuntu-22.04
 
-    permissions:
-      contents: read
+```
+steps:
+  - name: Checkout
+    uses: actions/checkout@v4
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+  - name: Install Docker
+    run: |
+      sudo apt update
+      sudo apt install -y docker.io
 
-      - name: Install dependencies
-        run: |
-          sudo apt update
+  - name: Start Docker
+    run: |
+      sudo systemctl start docker
 
-          sudo apt install -y \
-            coreutils \
-            quilt \
-            parted \
-            qemu-user-static \
-            binfmt-support \
-            debootstrap \
-            zerofree \
-            zip \
-            dosfstools \
-            libarchive-tools \
-            libcap2-bin \
-            grep \
-            rsync \
-            xz-utils \
-            file \
-            git \
-            curl \
-            bc \
-            arch-test \
-            qemu-utils
+  - name: Build TurboPi OS
+    run: |
+      sudo ./build-docker.sh
 
-      - name: Enable binfmt
-        run: |
-          sudo update-binfmts --enable
-
-      - name: Build image
-        run: |
-          sudo ./build.sh
-
-      - name: Upload image
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: TurboPiOS
-          path: deploy/*.img*
+  - name: Upload Image
+    uses: actions/upload-artifact@v4
+    with:
+      name: TurboPiOS
+      path: deploy/*
+```
