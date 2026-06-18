@@ -8,71 +8,77 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Checkout
+      # 1. まずはユーザー自身のリポジトリ（configやカスタムスクリプト）を一時フォルダに持ってくる
+      - name: Checkout User Customizations
         uses: actions/checkout@v4
+        with:
+          path: user-custom
 
-      - name: Debug Branch
+      # 2. 本家ラズパイ公式の「bookworm専用」のクリーンな pi-gen をクローン
+      - name: Clone Official pi-gen (Bookworm Branch)
         run: |
-          git branch
-          git rev-parse --abbrev-ref HEAD
+          git clone --depth 1 --branch bookworm https://github.com/rpi-distro/pi-gen.git pi-gen-core
 
-      # 1. Dockerビルドと最も相性が良い方法でQEMUをセットアップ
+      # 3. あなたのカスタムファイルを公式の pi-gen 環境にインジェクション（注入）
+      - name: Inject Custom Configurations
+        run: |
+          mkdir -p pi-gen-core/stage2/05-custom-apps
+          if [ -d user-custom/stage2/05-custom-apps ]; then
+            cp -r user-custom/stage2/05-custom-apps/* pi-gen-core/stage2/05-custom-apps/
+          fi
+          
+          if [ -f user-custom/config ]; then
+            cp user-custom/config pi-gen-core/config
+          else
+            echo "IMG_NAME='TurboPiOS'" > pi-gen-core/config
+            echo "RELEASE='bookworm'" >> pi-gen-core/config
+            echo "ENABLE_SSH=1" >> pi-gen-core/config
+            echo "FIRST_USER_NAME='pi'" >> pi-gen-core/config
+            echo "FIRST_USER_PASS='raspberry'" >> pi-gen-core/config
+            echo "USE_QEMU=1" >> pi-gen-core/config
+          fi
+          
+          # Dockerビルド用のセーフティ設定を追記
+          echo "PRESERVE_CONTAINER=1" >> pi-gen-core/config
+
+      # 4. Windowsの改行コード(CRLF)の嫌がらせをここで確実に抹殺
+      - name: Fix Line Endings and Permissions
+        run: |
+          find pi-gen-core/stage2/05-custom-apps/ -type f -name "*.sh" -exec sed -i 's/\r$//' {} + || true
+          find pi-gen-core/stage2/05-custom-apps/ -type f -name "*.sh" -exec chmod +x {} + || true
+
+      # 5. Dockerビルドに最適な方法でQEMUをセットアップ
       - name: Setup QEMU for ARM (Docker-friendly)
         uses: docker/setup-qemu-action@v3
         with:
           platforms: arm,arm64
 
-      # 2. Windowsの改行コード(CRLF)をLinux用(LF)に自動修正
-      - name: Fix Line Endings and Permissions
-        run: |
-          sed -i 's/\r$//' stage2/05-custom-apps/*.sh || true
-          chmod +x stage2/05-custom-apps/*.sh || true
-
-      # 3. config ファイルの検証と、Dockerビルド用のセーフティ設定を追記
-      - name: Prepare Config File
-        run: |
-          if [ ! -f config ]; then
-            echo "Warning: config file not found. Creating default..."
-            echo "IMG_NAME='TurboPiOS'" > config
-            echo "RELEASE='bookworm'" >> config
-            echo "ENABLE_SSH=1" >> config
-            echo "FIRST_USER_NAME='pi'" >> config
-            echo "FIRST_USER_PASS='raspberry'" >> config
-            echo "USE_QEMU=1" >> config
-          fi
-          # Dockerコンテナが途中で消えてエラーログを紛失するのを防ぐ設定を追記
-          echo "PRESERVE_CONTAINER=1" >> config
-
-      - name: Clean old build
-        run: |
-          sudo rm -rf work deploy
-
-      # 4. Dockerを使ってビルドを実行
+      # 6. 公式ベースのディレクトリに移動して Docker ビルドを実行！
       - name: Build TurboPi OS
         shell: bash
         run: |
+          cd pi-gen-core
           chmod +x build-docker.sh
           bash ./build-docker.sh
 
-      # 5. デバッグ用：進捗やエラーのログを確認するためのステップ
+      # ===== デバッグ ＆ 成果物回収（あなたの優秀なコードをベースにパスを最適化） =====
       - name: Show deploy contents
         if: always()
         run: |
           echo "===== DEPLOY ====="
-          find deploy 2>/dev/null || true
+          find pi-gen-core/deploy 2>/dev/null || true
 
       - name: Show debootstrap log
         if: always()
         run: |
-          find . -name debootstrap.log
-          cat work/TurboPiOS/stage0/debootstrap.log 2>/dev/null || true
+          echo "===== DEBOOTSTRAP LOG ====="
+          cat pi-gen-core/work/*/stage0/debootstrap.log 2>/dev/null || true
 
-      # 6. 完成したOSイメージ（またはエラーログ）を成果物として保存
       - name: Upload Image
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: TurboPiOS
           path: |
-            deploy/**
-            work/**/deploy/**
+            pi-gen-core/deploy/**
+            pi-gen-core/work/**/deploy/**
