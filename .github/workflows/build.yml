@@ -1,33 +1,31 @@
 name: Build TurboPi OS
 
 on:
-workflow_dispatch:
+  workflow_dispatch:
 
 jobs:
-build:
-runs-on: ubuntu-22.04
+  build:
+    runs-on: ubuntu-22.04
 
-```
-steps:
-  - name: Checkout
-    uses: actions/checkout@v4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-  - name: Install Docker
-    run: |
-      sudo apt update
-      sudo apt install -y docker.io
+      - name: Install Docker
+        run: |
+          sudo apt update
+          sudo apt install -y docker.io
 
-  - name: Start Docker
-    run: |
-      sudo systemctl start docker
+      - name: Start Docker
+        run: |
+          sudo systemctl start docker
 
-  - name: Build TurboPi OS
-    run: |
-      sudo ./build-docker.sh
+      - name: Build TurboPi OS
+        run: |
+          sudo ./build-docker.sh
 
-  - name: Upload Image
-    uses: actions/upload-artifact@v4
-    with:
-      name: TurboPiOS
-      path: deploy/*
-```
+      - name: Upload Image
+        uses: actions/upload-artifact@v4
+        with:
+          name: TurboPiOS
+          path: deploy/*
