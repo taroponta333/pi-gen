@@ -11,17 +11,39 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install QEMU
+      - name: Install Docker
         run: |
           sudo apt update
-          sudo apt install -y qemu-user-static binfmt-support
+          sudo apt install -y docker.io qemu-user-static dos2unix
+
+      - name: Debug build-docker.sh
+        run: |
+          pwd
+          ls -la
+          file build-docker.sh
+          head -10 build-docker.sh
+          sed -n '1,10p' build-docker.sh | cat -A
+
+      - name: Fix line endings
+        run: |
+          dos2unix build-docker.sh || true
+          chmod +x build-docker.sh
 
       - name: Build TurboPi OS
+        shell: bash
         run: |
-          sudo ./build-docker.sh
+          bash ./build-docker.sh
+
+      - name: Show deploy contents
+        if: always()
+        run: |
+          echo "=== DEPLOY ==="
+          find deploy -type f 2>/dev/null || true
 
       - name: Upload Image
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: TurboPiOS
-          path: deploy/*
+          path: |
+            deploy/**
