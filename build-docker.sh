@@ -85,6 +85,7 @@ BUILD_OPTS="$(echo "${BUILD_OPTS:-}" | sed -E 's@\-c\s?([^ ]+)@-c /config@')"
 BASE_IMAGE=debian:trixie
 
 ${DOCKER} build --build-arg BASE_IMAGE=${BASE_IMAGE} -t pi-gen "${DIR}"
+
 if [ "${CONTAINER_EXISTS}" != "" ]; then
   DOCKER_CMDLINE_NAME="${CONTAINER_NAME}_cont"
   DOCKER_CMDLINE_PRE="--rm"
@@ -111,8 +112,10 @@ if [ "${binfmt_misc_required}" = "1" ]; then
 
   if qemu_arm=$(which qemu-arm 2>/dev/null); then
     echo "Found qemu-arm: ${qemu_arm}"
+
   elif qemu_arm=$(which qemu-arm-static 2>/dev/null); then
     echo "Found qemu-arm-static: ${qemu_arm}"
+
   else
     echo "WARNING: qemu-arm not found, continuing anyway"
     qemu_arm=""
@@ -126,6 +129,7 @@ if [ "${binfmt_misc_required}" = "1" ]; then
     fi
 
     if ls /proc/sys/fs/binfmt_misc/qemu-arm* >/dev/null 2>&1; then
+
       if ! grep -q "^interpreter ${qemu_arm}" /proc/sys/fs/binfmt_misc/qemu-arm* ; then
 
         reg="echo ':qemu-arm-rpi:M::"\
@@ -133,14 +137,19 @@ if [ "${binfmt_misc_required}" = "1" ]; then
 "\xff\xff\xff\xff\xff\xff\xff\x00\xff\xff\xff\xff\xff\xff\xff\xff\xfe\xff\xff\xff:"\
 "${qemu_arm}:F' > /proc/sys/fs/binfmt_misc/register"
 
+        echo "Registering qemu-arm for binfmt_misc..."
         sudo bash -c "${reg}" 2>/dev/null || true
+
       fi
+
     fi
 
   fi
 
 fi
+
 trap 'echo "got CTRL+C... please wait 5s" && ${DOCKER} stop -t 5 ${DOCKER_CMDLINE_NAME}' SIGINT SIGTERM
+
 time ${DOCKER} run \
   $DOCKER_CMDLINE_PRE \
   --name "${DOCKER_CMDLINE_NAME}" \
@@ -151,14 +160,13 @@ time ${DOCKER} run \
   $DOCKER_CMDLINE_POST \
   pi-gen \
   bash -e -o pipefail -c "
-    dpkg-reconfigure qemu-user-binfmt &&
-    # binfmt_misc is sometimes not mounted with debian trixie image
+    dpkg-reconfigure qemu-user-binfmt || true &&
     (mount binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc || true) &&
-    cd /pi-gen; ./build.sh ${BUILD_OPTS} &&
-    rsync -av work/*/build.log deploy/
+    cd /pi-gen;
+    ./build.sh ${BUILD_OPTS};
+    rsync -av work/*/build.log deploy/ || true
   " &
-  wait "$!"
-
+wait "$!"
 # Ensure that deploy/ is always owned by calling user
 echo "copying results from deploy/"
 ${DOCKER} cp "${CONTAINER_NAME}":/pi-gen/deploy - | tar -xf -
