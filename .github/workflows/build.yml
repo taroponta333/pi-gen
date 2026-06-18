@@ -28,16 +28,24 @@ jobs:
           sed -i 's/\r$//' stage2/05-custom-apps/*.sh || true
           chmod +x stage2/05-custom-apps/*.sh || true
 
+      # 3. config ファイルの検証と、Dockerビルド用のセーフティ設定を追記
+      - name: Prepare Config File
+        run: |
+          if [ ! -f config ]; then
+            echo "Warning: config file not found. Creating default..."
+            echo "IMG_NAME='TurboPiOS'" > config
+            echo "RELEASE='bookworm'" >> config
+            echo "ENABLE_SSH=1" >> config
+            echo "FIRST_USER_NAME='pi'" >> config
+            echo "FIRST_USER_PASS='raspberry'" >> config
+            echo "USE_QEMU=1" >> config
+          fi
+          # Dockerコンテナが途中で消えてエラーログを紛失するのを防ぐ設定を追記
+          echo "PRESERVE_CONTAINER=1" >> config
+
       - name: Clean old build
         run: |
           sudo rm -rf work deploy
-
-      # 3. Dockerビルドが読み込むための「安定版設定」をここで作成
-      - name: Create Config File
-        run: |
-          echo "IMG_NAME='TurboPiOS'" > config
-          echo "RELEASE='bookworm'" >> config
-          echo "PRESERVE_CONTAINER=1" >> config
 
       # 4. Dockerを使ってビルドを実行
       - name: Build TurboPi OS
@@ -46,7 +54,7 @@ jobs:
           chmod +x build-docker.sh
           bash ./build-docker.sh
 
-      # ===== ここから下はユーザーさんの優秀なデバッグ用ステップをそのまま継承 =====
+      # 5. デバッグ用：進捗やエラーのログを確認するためのステップ
       - name: Show deploy contents
         if: always()
         run: |
@@ -59,6 +67,7 @@ jobs:
           find . -name debootstrap.log
           cat work/TurboPiOS/stage0/debootstrap.log 2>/dev/null || true
 
+      # 6. 完成したOSイメージ（またはエラーログ）を成果物として保存
       - name: Upload Image
         if: always()
         uses: actions/upload-artifact@v4
