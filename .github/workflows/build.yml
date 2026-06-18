@@ -4,12 +4,28 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  build:
+    runs-on: ubuntu-22.04
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Hello
+      - name: Install Dependencies
         run: |
-          echo "TurboPi OS Build Started!"
+          sudo apt update
+          sudo apt install -y \
+            coreutils quilt parted qemu-user-static \
+            debootstrap zerofree zip dosfstools \
+            libarchive-tools libcap2-bin grep rsync \
+            xz-utils file git curl bc
+
+      - name: Build TurboPi OS
+        run: |
+          sudo ./build.sh
+
+      - name: Upload Image
+        uses: actions/upload-artifact@v4
+        with:
+          name: TurboPiOS
+          path: deploy/*.img.xz
