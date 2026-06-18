@@ -16,22 +16,37 @@ jobs:
           git branch
           git rev-parse --abbrev-ref HEAD
 
-      - name: Install QEMU
+      # 1. Dockerビルドと最も相性が良い方法でQEMUをセットアップ
+      - name: Setup QEMU for ARM (Docker-friendly)
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm,arm64
+
+      # 2. Windowsの改行コード(CRLF)をLinux用(LF)に自動修正
+      - name: Fix Line Endings and Permissions
         run: |
-          sudo apt update
-          sudo apt remove -y qemu-user-binfmt || true
-          sudo apt install -y qemu-user-static binfmt-support
+          sed -i 's/\r$//' stage2/05-custom-apps/*.sh || true
+          chmod +x stage2/05-custom-apps/*.sh || true
 
       - name: Clean old build
         run: |
           sudo rm -rf work deploy
 
+      # 3. Dockerビルドが読み込むための「安定版設定」をここで作成
+      - name: Create Config File
+        run: |
+          echo "IMG_NAME='TurboPiOS'" > config
+          echo "RELEASE='bookworm'" >> config
+          echo "PRESERVE_CONTAINER=1" >> config
+
+      # 4. Dockerを使ってビルドを実行
       - name: Build TurboPi OS
         shell: bash
         run: |
           chmod +x build-docker.sh
           bash ./build-docker.sh
 
+      # ===== ここから下はユーザーさんの優秀なデバッグ用ステップをそのまま継承 =====
       - name: Show deploy contents
         if: always()
         run: |
