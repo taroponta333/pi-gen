@@ -11,15 +11,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Docker
-        run: |
-          sudo apt update
-          sudo apt install -y docker.io
-
-      - name: Start Docker
-        run: |
-          sudo systemctl start docker
-
       - name: Build TurboPi OS
         run: |
           sudo ./build-docker.sh
