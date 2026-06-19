@@ -79,6 +79,11 @@ jobs:
           mkdir -p /etc/xdg/autostart
           echo -e "[Desktop Entry]\nName=Fcitx 5\nExec=fcitx5 -d\nType=Application" > /etc/xdg/autostart/fcitx5.desktop
 
+          # 🔥 ハック・開発・解析・【超高速GUI変換ツール】の一斉導入
+          # ========================================================
+          # zenity（GUI作成ツール）をパッケージに追加
+          apt install -y ghex ghidra binwalk p7zip-full wget gpg curl arduino geany libnfc-bin nfc-tools ffmpeg genisoimage zenity
+          
           apt clean
           EOF
 
