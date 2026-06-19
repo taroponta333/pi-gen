@@ -69,6 +69,12 @@ jobs:
           apt install -y ./turbowarp-desktop_1.12.2_amd64.deb
           rm ./turbowarp-desktop_1.12.2_amd64.deb
 
+          # ========================================================
+          # 🔥 ハック・開発・解析・【超高速ファイル変換】ツールの一斉導入
+          # ========================================================
+          # 以前のツール群に加えて、ffmpeg（動画変換）と genisoimage（ISO作成ツール）を追加
+          apt install -y ghex ghidra binwalk p7zip-full wget gpg curl arduino geany libnfc-bin nfc-tools ffmpeg genisoimage
+
           # Fcitx5（日本語入力）の自動起動設定
           mkdir -p /etc/xdg/autostart
           echo -e "[Desktop Entry]\nName=Fcitx 5\nExec=fcitx5 -d\nType=Application" > /etc/xdg/autostart/fcitx5.desktop
