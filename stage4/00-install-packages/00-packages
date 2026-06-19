@@ -4,3 +4,6 @@ rpd-graphics
 rpd-utilities
 rpd-wayland-extras
 rpd-x-extras
+fonts-noto-cjk
+fcitx5
+fcitx5-mozc
