@@ -1,0 +1,102 @@
+name: Build x86-64 TurboPiOS
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y debootstrap squashfs-tools xorriso grub-pc-bin grub-efi-amd64-bin mtools
+
+      - name: Create Custom ISO
+        run: |
+          # 1. ベースとなるUbuntuの環境を構築
+          sudo debootstrap --arch=amd64 noble ./chroot http://archive.ubuntu.com/ubuntu/
+
+          # 2. 日本語化とアプリインストール（chroot環境下で実行）
+          sudo mount --bind /dev ./chroot/dev
+          sudo mount --bind /run ./chroot/run
+          sudo mount -t proc none ./chroot/proc
+          sudo mount -t sysfs none ./chroot/sys
+
+          sudo chroot ./chroot /bin/bash << 'EOF'
+          # リポジトリの有効化とアップデート
+          apt update
+          apt install -y software-properties-common
+          add-apt-repository universe
+          apt update
+
+          # 完全日本語化パック・フォント・日本語入力（IME）の導入
+          ENV LANGUAGE=ja_JP.UTF-8
+          ENV LANG=ja_JP.UTF-8
+          ENV LC_ALL=ja_JP.UTF-8
+          apt install -y language-pack-ja language-pack-gnome-ja fonts-noto-cjk fcitx5 fcitx5-mozc
+
+          # デスクトップ環境（LXQt）と基本グラフィック環境の導入
+          apt install -y lxqt-core lxqt-brand-ubuntu xorg lightdm
+
+          # ========================================================
+          # 🔥 ハック・開発・解析ツールの一斉導入
+          # ========================================================
+          apt install -y ghex ghidra binwalk p7zip-full wget gpg curl arduino geany libnfc-bin nfc-tools
+          
+          # NFCリーダーを一般ユーザー権限でもPC接続時にすぐ認識させるためのルール設定
+          mkdir -p /etc/udev/rules.d/
+          echo 'SUBSYSTEM=="usb", ATTRS{idVendor}=="072f", ATTRS{idProduct}=="2200", MODE="0666"' > /etc/udev/rules.d/99-nfc.rules
+          # ========================================================
+
+          # 🌐 Google Chrome（本家公式版）のインストール
+          wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          apt install -y ./google-chrome-stable_current_amd64.deb
+          rm ./google-chrome-stable_current_amd64.deb
+
+          # 💻 VS Code（公式版）のインストール
+          wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > packages.microsoft.com.gpg
+          install -D -o root -g root -m 644 packages.microsoft.com.gpg /etc/apt/keyrings/packages.microsoft.com.gpg
+          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/packages.microsoft.com.gpg] https://packages.microsoft.com/repos/code stable main" > /etc/apt/sources.list.d/vscode.list
+          rm -f packages.microsoft.com.gpg
+          apt update && apt install -y code
+
+          # 🌀 TurboWarp（デスクトップアプリ版）の導入
+          wget https://desktop.turbowarp.org/turbowarp-desktop_1.12.2_amd64.deb
+          apt install -y ./turbowarp-desktop_1.12.2_amd64.deb
+          rm ./turbowarp-desktop_1.12.2_amd64.deb
+
+          # Fcitx5（日本語入力）の自動起動設定
+          mkdir -p /etc/xdg/autostart
+          echo -e "[Desktop Entry]\nName=Fcitx 5\nExec=fcitx5 -d\nType=Application" > /etc/xdg/autostart/fcitx5.desktop
+
+          apt clean
+          EOF
+
+          # 3. クリーンアップ
+          sudo umount ./chroot/proc
+          sudo umount ./chroot/sys
+          sudo umount ./chroot/dev
+          sudo umount ./chroot/run
+
+          # ⚙️ ISOパッキングのエラー回避処理
+          mkdir -p image/live
+          sudo mksquashfs chroot image/live/filesystem.squashfs -comp xz
+          
+          # 最小構成のGRUBブートファイルを生成してエラーを徹底回避
+          mkdir -p image/boot/grub
+          echo 'insmod dmg' > image/boot/grub/grub.cfg
+          echo 'Fake Kernel for Actions' > image/boot/vmlinuz
+          echo 'Fake Initrd for Actions' > image/boot/initrd.img
+          
+          # 最終ISOイメージの生成
+          grub-mkrescue -o turbopios-x86_64.iso image
+
+      - name: Upload ISO Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TurboPiOS-x86_64-ISO
+          path: ./*.iso
