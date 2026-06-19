@@ -43,11 +43,15 @@ jobs:
           apt install -y lxqt-core lxqt-brand-ubuntu xorg lightdm
 
           # ========================================================
-          # 🔥 ハック・開発・解析ツールの一斉導入
+          # 🔥 ハック・開発・解析・【超高速GUI変換ツール】の一斉導入
           # ========================================================
-          apt install -y ghex ghidra binwalk p7zip-full wget gpg curl arduino geany libnfc-bin nfc-tools
+          # 改造・バイナリ・解析系（Ghex: アプリ版バイナリエディタ, binwalk: pac/unpac用）
+          apt install -y ghex ghidra binwalk p7zip-full wget gpg curl
+
+          # コード作成・電子工作・GUI構築・変換エンジン
+          apt install -y arduino geany zenity ffmpeg genisoimage libnfc-bin nfc-tools
           
-          # NFCリーダーを一般ユーザー権限でもPC接続時にすぐ認識させるためのルール設定
+          # NFCリーダー（ACR122U等）を一般ユーザー権限でもすぐ認識させるためのルール設定
           mkdir -p /etc/udev/rules.d/
           echo 'SUBSYSTEM=="usb", ATTRS{idVendor}=="072f", ATTRS{idProduct}=="2200", MODE="0666"' > /etc/udev/rules.d/99-nfc.rules
           # ========================================================
@@ -69,21 +73,60 @@ jobs:
           apt install -y ./turbowarp-desktop_1.12.2_amd64.deb
           rm ./turbowarp-desktop_1.12.2_amd64.deb
 
-          # ========================================================
-          # 🔥 ハック・開発・解析・【超高速ファイル変換】ツールの一斉導入
-          # ========================================================
-          # 以前のツール群に加えて、ffmpeg（動画変換）と genisoimage（ISO作成ツール）を追加
-          apt install -y ghex ghidra binwalk p7zip-full wget gpg curl arduino geany libnfc-bin nfc-tools ffmpeg genisoimage
+          # 📂 起動時にデスクトップへ「GUI爆速コンバーター」を配置する設定
+          mkdir -p /etc/skel/Desktop
+          
+          # 変換スクリプト本体の作成
+          cat << 'SCRIPT' > /etc/skel/Desktop/converter.sh
+          #!/bin/bash
+          MODE=$(zenity --list --title="TurboPiOS 爆速コンバーター" --text="実行したい変換モードを選んでください（100MB制限なし）" --radiolist --column="選択" --column="モード" TRUE "① MP4 ➔ AMV (動画変換)" FALSE "② フォルダ ➔ ISO (イメージ化)")
+          if [ -z "$MODE" ]; then exit; fi
+
+          if [[ "$MODE" == *"①"* ]]; then
+              INPUT=$(zenity --file-selection --title="変換したいMP4動画ファイルを選んでください" --file-filter="*.mp4")
+              if [ -z "$INPUT" ]; then exit; fi
+              OUTPUT="${INPUT%.*}.amv"
+              (
+              echo "# 変換中... パソコンのフルパワーでローカル処理しています。"
+              ffmpeg -i "$INPUT" -f amv -s 160x120 -r 16 -ac 1 -ar 22050 -qmin 3 -qmax 3 "$OUTPUT" -y 2>&1
+              echo "100"
+              ) | zenity --progress --title="進行状況" --text="動画を変換しています..." --percentage=0 --auto-close
+              zenity --info --title="完了" --text="AMVへの変換が完了しました！\n出力先: $OUTPUT"
+
+          elif [[ "$MODE" == *"②"* ]]; then
+              DIR=$(zenity --file-selection --directory --title="ISOイメージにしたいフォルダを選んでください")
+              if [ -z "$DIR" ]; then exit; fi
+              OUTPUT="$HOME/Desktop/converted_project.iso"
+              (
+              echo "# ISOイメージを作成中..."
+              genisoimage -o "$OUTPUT" -R -J "$DIR" 2>&1
+              echo "100"
+              ) | zenity --progress --title="進行状況" --text="ISOを作成しています..." --percentage=0 --auto-close
+              zenity --info --title="完了" --text="ISOイメージの作成が完了しました！\nデスクトップに保存されました。"
+          fi
+          SCRIPT
+
+          chmod +x /etc/skel/Desktop/converter.sh
+
+          # デスクトップ用ショートカットアイコンの作成
+          cat << 'DESKTOP' > /etc/skel/Desktop/Converter.desktop
+          [Desktop Entry]
+          Version=1.0
+          Type=Application
+          Name=超高速ファイル変換
+          Comment=100MBの壁なしローカルコンバーター
+          Exec=/etc/skel/Desktop/converter.sh
+          Icon=system-run
+          Terminal=false
+          Categories=Utility;
+          DESKTOP
+          
+          chmod +x /etc/skel/Desktop/Converter.desktop
 
           # Fcitx5（日本語入力）の自動起動設定
           mkdir -p /etc/xdg/autostart
           echo -e "[Desktop Entry]\nName=Fcitx 5\nExec=fcitx5 -d\nType=Application" > /etc/xdg/autostart/fcitx5.desktop
 
-          # 🔥 ハック・開発・解析・【超高速GUI変換ツール】の一斉導入
-          # ========================================================
-          # zenity（GUI作成ツール）をパッケージに追加
-          apt install -y ghex ghidra binwalk p7zip-full wget gpg curl arduino geany libnfc-bin nfc-tools ffmpeg genisoimage zenity
-          
           apt clean
           EOF
 
@@ -97,7 +140,7 @@ jobs:
           mkdir -p image/live
           sudo mksquashfs chroot image/live/filesystem.squashfs -comp xz
           
-          # 最小構成のGRUBブートファイルを生成してエラーを徹底回避
+          # 最小構成のGRUBブートファイルを生成してビルド落ちを徹底回避
           mkdir -p image/boot/grub
           echo 'insmod dmg' > image/boot/grub/grub.cfg
           echo 'Fake Kernel for Actions' > image/boot/vmlinuz
